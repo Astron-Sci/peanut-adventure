@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>花生米大冒险 - 气管异物解剖学游戏</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#222;display:flex;justify-content:center;align-items:center;min-height:100vh;font-family:'Courier New',monospace;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;}
+.wrap{position:relative;width:100%;max-width:800px;}
+canvas{width:100%;border:3px solid #000;background:#fff;display:block;image-rendering:pixelated;-webkit-tap-highlight-color:transparent;}
+#screen{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;background:#fff;z-index:10;cursor:default;padding:20px;}
+#screen h1{color:#000;font-size:clamp(22px,5vw,36px);margin-bottom:4px;text-align:center;}
+#screen .sub{color:#555;font-size:clamp(11px,2.5vw,14px);margin-bottom:10px;text-align:center;}
+#screen p{color:#333;font-size:clamp(12px,2.8vw,15px);margin:2px 0;text-align:center;}
+#screen button{
+  padding:clamp(8px,2vw,12px) clamp(20px,5vw,30px);font-size:clamp(13px,3vw,16px);
+  background:#fff;color:#000;border:3px solid #000;cursor:pointer;margin:5px;
+  font-family:'Courier New',monospace;font-weight:bold;min-width:clamp(120px,30vw,150px);
+  -webkit-tap-highlight-color:transparent;
+}
+#screen button:active{background:#000;color:#fff;}
+#screen .btns{display:flex;gap:clamp(8px,2vw,12px);margin-top:12px;flex-wrap:wrap;justify-content:center;}
+#screen .hint{color:#999;font-size:clamp(10px,2.2vw,12px);margin-top:10px;text-align:center;}
+#result,#endPanel{
+  position:absolute;top:0;left:0;width:100%;height:100%;display:none;
+  flex-direction:column;justify-content:center;align-items:center;background:#fff;z-index:10;padding:20px;
+}
+#result.show,#endPanel.show{display:flex;}
+#result h2,#endPanel h2{color:#000;font-size:clamp(22px,5vw,30px);margin-bottom:5px;text-align:center;}
+#result .stat,#endPanel .stat{color:#000;font-size:clamp(14px,3.2vw,20px);margin:4px 0;text-align:center;}
+#result .tip{color:#555;font-size:clamp(12px,2.8vw,16px);max-width:90%;text-align:center;line-height:1.6;margin:10px 0;}
+#bc{max-width:90%;border:2px solid #000;background:#fff;image-rendering:pixelated;margin:8px 0;}
+#endPanel button,#result button{
+  padding:clamp(6px,1.5vw,10px) clamp(16px,4vw,24px);font-size:clamp(12px,2.8vw,15px);
+  background:#fff;color:#000;border:3px solid #000;cursor:pointer;margin:5px;
+  font-family:'Courier New',monospace;font-weight:bold;
+}
+#endPanel button:active,#result button:active{background:#000;color:#fff;}
+/* Mobile controls */
+#controls{position:absolute;bottom:clamp(5px,1.5vw,15px);left:0;width:100%;display:none;justify-content:space-between;padding:0 10px;z-index:5;pointer-events:none;}
+#controls.show{display:flex;}
+#controls button{
+  width:clamp(60px,15vw,90px);height:clamp(60px,15vw,90px);border:3px solid #000;
+  background:rgba(0,0,0,0.1);color:#000;font-size:clamp(24px,6vw,36px);border-radius:50%;
+  cursor:pointer;font-family:'Courier New',monospace;font-weight:bold;
+  -webkit-tap-highlight-color:transparent;pointer-events:auto;touch-action:none;
+  display:flex;align-items:center;justify-content:center;
+}
+#controls button:active{background:rgba(0,0,0,0.25);}
+</style>
+</head>
+<body>
+<div class="wrap">
+<canvas id="c" width="800" height="600"></canvas>
+<div id="controls"><button id="btnL">◀</button><button id="btnR">▶</button></div>
+<div id="screen">
+  <h1>🥜 花生米大冒险</h1>
+  <div class="sub">[ 气管异物解剖学游戏 ]</div>
+  <p>← → 移动接住花生米</p>
+  <p class="hint" style="color:#999;font-size:clamp(10px,2.2vw,12px);">接到10颗自动结束 · 看看掉进哪边</p>
+  <div class="btns">
+    <button ontouchend="go(1)" onclick="go(1)">🟢 新手</button>
+    <button ontouchend="go(2)" onclick="go(2)">🔴 地狱</button>
+  </div>
+  <div class="hint">右主支气管更粗更陡 · 花生米更容易掉进去</div>
+</div>
+<div id="endPanel">
+  <h2>🥜 解剖分析</h2>
+  <div class="stat" id="es1"></div>
+  <canvas id="bc" width="440" height="220"></canvas>
+  <div class="tip" id="etip"></div>
+  <button ontouchend="showResult()" onclick="showResult()">查看成绩 ▶</button>
+</div>
+<div id="result">
+  <h2>GAME OVER</h2>
+  <div class="stat" id="r1"></div>
+  <div class="stat" id="r2"></div>
+  <div class="stat" style="font-size:clamp(16px,3.8vw,22px);margin-top:6px;" id="r3"></div>
+  <div class="tip" id="rtip"></div>
+  <div class="btns">
+    <button ontouchend="re()" onclick="re()">再来一局</button>
+    <button ontouchend="back()" onclick="back()">返回菜单</button>
+  </div>
+</div>
+</div>
+
+<script>
+const c=document.getElementById('c'),ctx=c.getContext('2d');
+ctx.imageSmoothingEnabled=false;
+const W=800,H=600;
+const bc=document.getElementById('bc'),bctx=bc.getContext('2d');
+bctx.imageSmoothingEnabled=false;
+
+let state='menu',mode=1,f=0,score=0,pt=0,cf=0;
+let peanuts=[],parts=[],hits=[],chats=[],right=0,left=0,results=[];
+let animF=0,moveDir=0;
+const px={x:370,y:510,w:50,h:64,mouth:false,mt:0};
+const keys={};
+document.onkeydown=e=>{keys[e.key]=true;};
+document.onkeyup=e=>{keys[e.key]=false;};
+
+// Mobile controls
+const btnL=document.getElementById('btnL'),btnR=document.getElementById('btnR');
+let touchL=false,touchR=false;
+btnL.addEventListener('touchstart',e=>{e.preventDefault();touchL=true;});
+btnL.addEventListener('touchend',e=>{e.preventDefault();touchL=false;});
+btnR.addEventListener('touchstart',e=>{e.preventDefault();touchR=true;});
+btnR.addEventListener('touchend',e=>{e.preventDefault();touchR=false;});
+btnL.addEventListener('mousedown',()=>touchL=true);
+btnL.addEventListener('mouseup',()=>touchL=false);
+btnR.addEventListener('mousedown',()=>touchR=true);
+btnR.addEventListener('mouseup',()=>touchR=false);
+
+// Touch swipe on canvas
+let touchStartX=0;
+c.addEventListener('touchstart',e=>{touchStartX=e.touches[0].clientX;});
+c.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  const dx=e.touches[0].clientX-touchStartX;
+  if(dx>20){moveDir=1;}else if(dx<-20){moveDir=-1;}else{moveDir=0;}
+});
+c.addEventListener('touchend',()=>{moveDir=0;});
+
+function dr(x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(x,y,w,h);}
+
+function drawP(x,y,mo,dx){
+  const s=3;
+  dr(x+7*s,y,8*s,7*s,'#000');
+  dr(x+11*s,y+2*s,2*s,2*s,'#fff');
+  if(mo){dr(x+7*s,y+5*s,4*s,2*s,'#000');dr(x+8*s,y+5*s,1*s,2*s,'#fff');dr(x+10*s,y+5*s,1*s,2*s,'#fff');}
+  else dr(x+7*s,y+6*s,4*s,1*s,'#000');
+  dr(x+8*s,y-1*s,5*s,2*s,'#000');
+  dr(x+9*s,y+7*s,3*s,2*s,'#000');
+  dr(x+7*s,y+9*s,7*s,7*s,'#000');
+  dr(x+3*s,y+11*s,4*s,2*s,'#000');
+  dr(x+14*s,y+11*s,4*s,2*s,'#000');
+  dr(x+7*s,y+16*s,3*s,4*s,'#000');
+  dr(x+11*s,y+16*s,3*s,4*s,'#000');
+  dr(x+5*s,y+19*s,5*s,2*s,'#000');
+  dr(x+11*s,y+19*s,5*s,2*s,'#000');
+  if(dx>0)dr(x+17*s,y+8*s,2*s,2*s,'#000');
+}
+
+function drawPea(x,y,sz){
+  const s=Math.max(2,Math.floor(sz));
+  dr(x-2*s,y-s,4*s,2*s,'#000');
+  dr(x-s,y-2*s,2*s,4*s,'#000');
+  dr(x-2*s,y,4*s,2*s,'#000');
+  dr(x-s,y-s,2*s,1*s,'#888');
+}
+
+function drawChat(x,y,t){
+  ctx.fillStyle='#000';ctx.font='bold 28px monospace';ctx.fillText(t,x,y);
+}
+
+function spawn(){
+  const sd=mode===1?1:-1;
+  const sp=mode===1?2.2+Math.random()*1.3:6+Math.random()*3;
+  peanuts.push({
+    x:sd===1?-20:W+20,y:Math.random()*180+40,
+    vx:sd===1?sp:-sp,vy:-(5+Math.random()*3),
+    sz:4+Math.random()*2,caught:false
+  });
+}
+
+function drawCut(){
+  dr(0,0,W,H,'#fff');
+  dr(80,430,640,3,'#000');dr(150,433,10,50,'#000');dr(640,433,10,50,'#000');
+  dr(360,405,50,6,'#000');dr(355,413,60,5,'#000');
+  for(let i=0;i<6;i++)dr(365+(i%3)*10,402+Math.floor(i/3)*5,4,3,'#000');
+  drawP(330,340,cf%40<20&&cf>10,1);
+  if(cf>25){const p=((cf-25)%80)/80;drawPea(335+p*50,340-Math.sin(p*Math.PI)*50,4);}
+  const ds=[[15,'好香的花生米...'],[55,'哎！掉了！'],[95,'吸进气管了！'],[150,'快接住它！']];
+  for(const[s,t]of ds){if(cf>=s&&cf<s+40){ctx.fillStyle='#000';ctx.font='bold 28px monospace';ctx.fillText(t,280,90);break;}}
+  if(cf>200){
+    ctx.fillStyle='#000';ctx.font='28px monospace';ctx.textAlign='center';ctx.fillText('▶ GAME START',400,300);ctx.textAlign='left';
+    document.getElementById('controls').classList.add('show');
+  }
+  if(cf>240){state='play';f=0;}
+  cf++;
+}
+
+function update(){
+  f++;pt++;
+  const rate=mode===1?70:28;
+  if(pt>rate){pt=0;spawn();}
+  // Handle input
+  let mv=0;
+  if(keys['ArrowLeft']||keys['a'])mv=-1;
+  if(keys['ArrowRight']||keys['d'])mv=1;
+  if(touchL)mv=-1;
+  if(touchR)mv=1;
+  if(moveDir!==0)mv=moveDir;
+  px.x+=mv*5;
+  px.x=Math.max(0,Math.min(W-px.w,px.x));
+  if(px.mt>0)px.mt--;else px.mouth=false;
+
+  for(let i=peanuts.length-1;i>=0;i--){
+    const p=peanuts[i];p.vy+=0.25;p.x+=p.vx;p.y+=p.vy;
+    if(!p.caught&&p.x>px.x-8&&p.x<px.x+px.w+8&&p.y>px.y-5&&p.y<px.y+25){
+      p.caught=true;score++;px.mouth=true;px.mt=15;
+      const r=Math.random()<0.7;
+      if(r)right++;else left++;results.push(r);
+      hits.push({f:0});chats.push({t:'好吃!',f:0});
+      for(let j=0;j<6;j++)parts.push({x:p.x,y:p.y,vx:(Math.random()-0.5)*6,vy:(Math.random()-0.5)*6-2,life:20});
+      peanuts.splice(i,1);
+      if(score>=10){state='end';showEnd();return;}
+      continue;
+    }
+    if(p.x<-40||p.x>W+40||p.y>H+40){peanuts.splice(i,1);}
+  }
+  for(let i=hits.length-1;i>=0;i--){hits[i].f++;if(hits[i].f>25)hits.splice(i,1);}
+  for(let i=chats.length-1;i>=0;i--){chats[i].f++;if(chats[i].f>25)chats.splice(i,1);}
+  for(let i=parts.length-1;i>=0;i--){const p=parts[i];p.x+=p.vx;p.y+=p.vy;p.vy+=0.15;p.life--;if(p.life<=0)parts.splice(i,1);}
+}
+
+function drawGame(){
+  dr(0,0,W,H,'#fff');
+  ctx.strokeStyle='#ccc';ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(0,554);ctx.lineTo(W,554);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#000';ctx.font='24px monospace';ctx.fillText('🥜 '+score+'/10',20,30);
+  ctx.fillStyle='#888';ctx.font='18px monospace';ctx.fillText(mode===1?'🟢 新手':'🔴 地狱',20,58);
+  for(const p of peanuts)if(!p.caught)drawPea(p.x,p.y,p.sz);
+  const d=touchL?-1:touchR?1:keys['ArrowLeft']?-1:1;
+  drawP(px.x,px.y,px.mouth,d);
+  for(const h of hits){if(h.f<22){ctx.fillStyle='#000';ctx.font='bold 22px monospace';ctx.fillText('HP-1',px.x+px.w+5,px.y-10);}}
+  if(chats.length>0){const b=chats[chats.length-1];if(b.f<22)drawChat(px.x+15,px.y-35,b.t);}
+  ctx.fillStyle='rgba(0,0,0,0.05)';dr(W-4,0,4,H);
+  ctx.fillStyle='rgba(0,0,0,0.35)';ctx.font='14px monospace';
+  ctx.save();ctx.translate(W-18,300);ctx.rotate(-Math.PI/2);
+  ctx.fillText('← 右主支气管（异物高发侧）',0,0);ctx.restore();
+  for(const p of parts){if(p.life>0)dr(Math.round(p.x),Math.round(p.y),3,3,'#000');}
+}
+
+function showEnd(){
+  document.getElementById('endPanel').classList.add('show');
+  document.getElementById('controls').classList.remove('show');
+  document.getElementById('es1').textContent=`接住了 ${results.length} 颗 · 右侧 ${right} 颗 / 左侧 ${left} 颗`;
+  document.getElementById('etip').textContent=['右主支气管比左主更粗(⌀13mm vs 10mm)，更短(2-3cm vs 5cm)，更陡直(与气管夹角约25° vs 45°)','气管在胸骨角平面分叉，右主支气管几乎是气管的"直通延续"','临床统计约80%的气管异物发生在右侧','左主支气管前方有主动脉弓跨过，角度更大，异物更不易进入','吃饭时大笑或说话容易让食物误入气管，因为会厌软骨来不及盖住喉口'][Math.floor(Math.random()*5)];
+  animF=0;drawBronchi();
+}
+
+function drawBronchi(){
+  animF++;bctx.fillStyle='#fff';bctx.fillRect(0,0,440,220);
+  bctx.strokeStyle='#000';bctx.strokeRect(0,0,440,220);
+  bctx.fillStyle='#000';bctx.font='16px monospace';bctx.fillText('🥜 花生米去向分析',120,20);
+  const bx=220,by=100;
+  bctx.strokeStyle='#000';bctx.lineWidth=2;bctx.beginPath();bctx.moveTo(bx,by-40);bctx.lineTo(bx,by);bctx.stroke();
+  for(let i=-35;i<0;i+=6){bctx.strokeRect(bx-3,by+i,6,1);}
+  bctx.lineWidth=2;bctx.beginPath();bctx.moveTo(bx,by);bctx.lineTo(bx-45,by+45);bctx.stroke();
+  bctx.lineWidth=4;bctx.beginPath();bctx.moveTo(bx,by);bctx.lineTo(bx+55,by+50);bctx.stroke();
+  bctx.fillStyle='#555';bctx.font='14px monospace';bctx.fillText('左',bx-65,by+32);bctx.fillText('右',bx+60,by+32);
+  let rc=0,lc=0;bctx.fillStyle='#000';
+  const show=Math.min(results.length,Math.floor(animF/4));
+  for(let i=0;i<show;i++){const r=results[i],pct=Math.min(1,(animF-i*4)/20);const xx=r?bx+55*pct:bx-45*pct,yy=by+45*pct;bctx.beginPath();bctx.arc(xx,yy,3.5,0,Math.PI*2);bctx.fill();if(r)rc++;else lc++;}
+  bctx.font='22px monospace';bctx.fillText(rc+'',bx+50,by+70);bctx.fillText(lc+'',bx-55,by+70);
+  if(animF<results.length*4+50)requestAnimationFrame(drawBronchi);
+}
+
+function showResult(){
+  document.getElementById('endPanel').classList.remove('show');document.getElementById('result').classList.add('show');
+  document.getElementById('r1').textContent='→ 右主支气管（粗/短/直）：'+right+' 颗';document.getElementById('r2').textContent='→ 左主支气管（细/长/平）：'+left+' 颗';
+  document.getElementById('r3').textContent='共 '+results.length+' 颗';document.getElementById('rtip').textContent=['右主支气管比左主更粗(⌀13mm vs 10mm)，更短(2-3cm vs 5cm)，更陡直(与气管夹角约25° vs 45°)','气管在胸骨角平面分叉，右主支气管几乎是气管的"直通延续"','临床统计约80%的气管异物发生在右侧','左主支气管前方有主动脉弓跨过，角度更大，异物更不易进入','吃饭时大笑或说话容易让食物误入气管，因为会厌软骨来不及盖住喉口'][Math.floor(Math.random()*5)];
+}
+function go(d){mode=d;document.getElementById('screen').style.display='none';state='cut';cf=0;}
+function re(){
+  document.getElementById('result').classList.remove('show');document.getElementById('endPanel').classList.remove('show');
+  score=0;right=0;left=0;f=0;pt=0;peanuts=[];parts=[];hits=[];chats=[];results=[];px.x=370;px.mouth=false;px.mt=0;moveDir=0;touchL=false;touchR=false;go(mode);
+}
+function back(){
+  document.getElementById('result').classList.remove('show');document.getElementById('endPanel').classList.remove('show');
+  document.getElementById('controls').classList.remove('show');document.getElementById('screen').style.display='flex';
+  state='menu';score=0;right=0;left=0;f=0;pt=0;peanuts=[];parts=[];hits=[];chats=[];results=[];px.x=370;px.mouth=false;px.mt=0;moveDir=0;touchL=false;touchR=false;
+}
+function loop(){dr(0,0,W,H,'#fff');if(state==='cut')drawCut();else if(state==='play'){update();drawGame();}requestAnimationFrame(loop);}
+loop();
+</script>
+</body>
+</html>
